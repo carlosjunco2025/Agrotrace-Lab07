@@ -1,0 +1,56 @@
+{% extends 'agrotrace/base.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">Registrar Recepción Transaccional de Lote</h4>
+            </div>
+            <div class="card-body">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label font-weight-bold">Fundo Productor:</label>
+                        <select name="fundo_id" class="form-select" required>
+                            <option value="">-- Seleccione un Fundo --</option>
+                            {% for fundo in fundos %}
+                                <option value="{{ fundo.id }}">
+                                    {{ fundo.nombre_fundo }} (Cupos disponibles: {{ fundo.cupo_diario_lotes }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label font-weight-bold">Código del Lote:</label>
+                        <input type="text" name="codigo_lote" class="form-control" placeholder="Ej. LOT-2026-99" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Toneladas Brutas:</label>
+                            <input type="number" step="0.01" name="toneladas" class="form-control" placeholder="0.00" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">% Descarte:</label>
+                            <input type="number" step="0.01" name="porcentaje_descarte" class="form-control" value="0.00">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 mt-2">Procesar Recepción Transaccional</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

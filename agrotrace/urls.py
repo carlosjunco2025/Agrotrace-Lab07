@@ -15,4 +15,10 @@ urlpatterns = [
     path('lotes/nuevo/', views.lote_create, name='lote_create'),
     path('lotes/editar/<int:pk>/', views.lote_update, name='lote_update'),
     path('lotes/eliminar/<int:pk>/', views.lote_delete, name='lote_delete'),
+
+    # Operación Transaccional (Ejercicio 3 - Lab 07)
+    path('recepcion-transaccional/', views.recepcion_transaccional, name='recepcion_transaccional'),
+
+# Reporte General (Ejercicio 6 - Lab 07)
+    path('reporte/', views.reporte_general, name='reporte_general'),
 ]
