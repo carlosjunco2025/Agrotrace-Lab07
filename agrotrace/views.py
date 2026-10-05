@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import F
-from .models import FundoProductor, LoteRecepcionado
+from django.db.models import F, Sum, Avg, Count
+from .models import FundoProductor, LoteRecepcionado, CertificacionLote
 from .forms import FundoProductorForm, LoteRecepcionadoForm
 
 # ==========================================
@@ -44,15 +44,9 @@ def fundo_delete(request, pk):
 # Vistas de LoteRecepcionado
 # ==========================================
 def lote_list(request):
-    # Optimización de consultas ORM
-    # select_related para relaciones 1:1 y 1:N (JOIN en SQL)
-    # prefetch_related para relaciones N:M
     lotes = LoteRecepcionado.objects.select_related(
-        'fundo', 
-        'evaluacion_calidad'
-    ).prefetch_related(
-        'certificaciones'
-    )
+        'fundo', 'evaluacion_calidad'
+    ).prefetch_related('certificaciones').pendientes()
     return render(request, 'agrotrace/lote_list.html', {'lotes': lotes})
 
 def lote_create(request):
@@ -84,7 +78,7 @@ def lote_delete(request, pk):
     return render(request, 'agrotrace/lote_confirm_delete.html', {'object': lote, 'type': 'Lote'})
 
 # ==========================================
-# Ejercicio 3: Vista Transaccional con F()
+# Ejercicio 3/10: Vista Transaccional con F()
 # ==========================================
 def recepcion_transaccional(request):
     if request.method == 'POST':
@@ -94,19 +88,15 @@ def recepcion_transaccional(request):
         porcentaje_descarte = request.POST.get('porcentaje_descarte', 0)
 
         try:
-            # Transacción atómica
             with transaction.atomic():
                 fundo = FundoProductor.objects.select_for_update().get(id=fundo_id)
 
-                # Regla de negocio: Validar existencia de cupos
                 if fundo.cupo_diario_lotes <= 0:
                     raise ValueError(f"El fundo '{fundo.nombre_fundo}' ya no cuenta con cupo diario disponible.")
 
-                # 1. Descuento directamente en la BD usando F()
                 fundo.cupo_diario_lotes = F('cupo_diario_lotes') - 1
                 fundo.save()
 
-                # 2. Creación del registro de lote
                 LoteRecepcionado.objects.create(
                     fundo=fundo,
                     codigo_lote=codigo_lote,
@@ -116,20 +106,19 @@ def recepcion_transaccional(request):
                 )
 
                 messages.success(request, f"¡Éxito! Lote {codigo_lote} registrado y cupo descontado.")
-                # Patrón Post/Redirect/Get
                 return redirect('agrotrace:lote_list')
 
         except Exception as e:
-            # Mensaje de error (Rollback ejecutado)
             messages.error(request, f"Operación cancelada (Rollback): {str(e)}")
 
     fundos = FundoProductor.objects.all()
     return render(request, 'agrotrace/recepcion_transaccional.html', {'fundos': fundos})
 
-from django.db.models import Sum, Avg, Count
-
+# ==========================================
+# Ejercicio 6/11: Vista de Reporte — ÚNICA DEFINICIÓN, completa
+# ==========================================
 def reporte_general(request):
-    # Ejercicio 4: Agregación Global en CertificacionLote
+    # Ejercicio 4: Agregación global sobre el modelo intermedio
     metricas_globales = CertificacionLote.objects.aggregate(
         total_costo=Sum('costo_auditoria'),
         promedio_costo=Avg('costo_auditoria'),
@@ -143,40 +132,18 @@ def reporte_general(request):
         promedio_descarte=Avg('porcentaje_descarte')
     ).order_by('-total_toneladas')
 
-    # Ejercicio 5.2: Anotación por objeto (Lotes por Fundo)
+    # Ejercicio 5.2: Anotación por objeto (lotes por fundo)
     fundos_resumen = FundoProductor.objects.annotate(
         total_lotes=Count('lotes')
     )
+
+    # Ejercicio 7/12: QuerySet personalizado encadenado
+    lotes_criticos = LoteRecepcionado.objects.pendientes().con_alto_descarte(umbral=1.5)
 
     context = {
         'metricas_globales': metricas_globales,
         'reporte_estados': reporte_estados,
         'fundos_resumen': fundos_resumen,
-    }
-    return render(request, 'agrotrace/reporte.html', context)
-
-# Vista 1: Listado de Lotes utilizando el método del QuerySet
-def lote_list(request):
-    # Reemplazo de consulta: Uso de select_related/prefetch_related + método personalizado
-    lotes = LoteRecepcionado.objects.select_related(
-        'fundo', 
-        'evaluacion_calidad'
-    ).prefetch_related(
-        'certificaciones'
-    ).pendientes() # <-- Método del QuerySet personalizado
-
-    return render(request, 'agrotrace/lote_list.html', {'lotes': lotes})
-
-
-# Vista 2: Vista de Reporte reutilizando métodos encadenados
-def reporte_general(request):
-    # ... (métricas globales) ...
-
-    # Uso encadenado de los métodos del QuerySet personalizado
-    lotes_criticos = LoteRecepcionado.objects.pendientes().con_alto_descarte(umbral=1.5)
-
-    context = {
-        # ... tus otros contextos ...
         'lotes_criticos': lotes_criticos,
     }
     return render(request, 'agrotrace/reporte.html', context)
