@@ -42,6 +42,10 @@ class LoteQuerySet(models.QuerySet):
         """Regla de negocio: Retorna solo lotes pendientes de evaluación"""
         return self.filter(estado_evaluacion='PENDIENTE')
 
+    def aprobados(self):
+        """Retorna lotes procesados, considerados conformes."""
+        return self.filter(estado_evaluacion='PROCESADO')
+
     def con_alto_descarte(self, umbral=2.0):
         """Regla de negocio: Retorna lotes cuyo descarte supera el umbral"""
         return self.filter(porcentaje_descarte__gt=umbral)
